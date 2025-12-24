@@ -1,0 +1,1668 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canva-Style Form Builder</title>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary: #667eea;
+            --primary-light: #a3bffa;
+            --secondary: #9f7aea;
+            --success: #48bb78;
+            --danger: #f56565;
+            --warning: #ed8936;
+            --dark: #2d3748;
+            --light: #f7fafc;
+            --border: #e2e8f0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: #f5f7fa;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .app-container {
+            display: grid;
+            grid-template-columns: 70px 280px 1fr 350px;
+            height: 100vh;
+        }
+
+        /* Toolbar */
+        .toolbar {
+            background: var(--dark);
+            display: flex;
+            flex-direction: column;
+            padding-top: 20px;
+        }
+
+        .toolbar-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 15px 0;
+            color: #a0aec0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .toolbar-item:hover,
+        .toolbar-item.active {
+            background: rgba(102, 126, 234, 0.1);
+            color: var(--primary-light);
+        }
+
+        .toolbar-item i {
+            font-size: 20px;
+            margin-bottom: 5px;
+        }
+
+        .toolbar-item span {
+            font-size: 12px;
+        }
+
+        /* Elements Panel */
+        .elements-panel {
+            background: white;
+            border-right: 1px solid var(--border);
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .panel-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--dark);
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .elements-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .element-card {
+            background: var(--light);
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            cursor: grab;
+            transition: all 0.3s ease;
+        }
+
+        .element-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .element-card i {
+            font-size: 24px;
+            color: var(--primary);
+            margin-bottom: 8px;
+        }
+
+        .element-card span {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--dark);
+            display: block;
+        }
+
+        /* Canvas Area */
+        .canvas-container {
+            background: #f0f4f8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: auto;
+            position: relative;
+        }
+
+        .canvas {
+            width: 800px;
+            min-height: 600px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            position: relative;
+            margin: 20px;
+        }
+
+        .canvas.grid {
+            background-image: 
+                linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        /* Canvas Elements */
+        .canvas-element {
+            position: absolute;
+            border: 2px solid transparent;
+            border-radius: 4px;
+            cursor: move;
+            min-width: 100px;
+            min-height: 30px;
+            transition: border-color 0.3s ease;
+            box-sizing: border-box;
+        }
+
+        .canvas-element:hover {
+            border-color: rgba(102, 126, 234, 0.3);
+        }
+
+        .canvas-element.selected {
+            border-color: var(--primary) !important;
+            box-shadow: 0 0 0 1px var(--primary);
+        }
+
+        .element-content {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        /* Resize Handles */
+        .resize-handle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: white;
+            border: 2px solid var(--primary);
+            border-radius: 50%;
+            z-index: 100;
+            display: none;
+        }
+
+        .canvas-element.selected .resize-handle {
+            display: block;
+        }
+
+        .resize-nw { top: -5px; left: -5px; cursor: nw-resize; }
+        .resize-ne { top: -5px; right: -5px; cursor: ne-resize; }
+        .resize-sw { bottom: -5px; left: -5px; cursor: sw-resize; }
+        .resize-se { bottom: -5px; right: -5px; cursor: se-resize; }
+        .resize-n { top: -5px; left: 50%; transform: translateX(-50%); cursor: n-resize; }
+        .resize-s { bottom: -5px; left: 50%; transform: translateX(-50%); cursor: s-resize; }
+        .resize-e { right: -5px; top: 50%; transform: translateY(-50%); cursor: e-resize; }
+        .resize-w { left: -5px; top: 50%; transform: translateY(-50%); cursor: w-resize; }
+
+        /* Element Controls */
+        .element-controls {
+            position: absolute;
+            top: -35px;
+            right: 0;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            display: flex;
+            gap: 5px;
+            padding: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: none;
+        }
+
+        .canvas-element.selected .element-controls {
+            display: flex;
+        }
+
+        .control-btn {
+            width: 28px;
+            height: 28px;
+            border: none;
+            background: var(--light);
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            color: var(--dark);
+            transition: all 0.2s ease;
+        }
+
+        .control-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Properties Panel */
+        .properties-panel {
+            background: white;
+            border-left: 1px solid var(--border);
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .property-group {
+            margin-bottom: 25px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .property-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .property-title i {
+            color: var(--primary);
+            width: 20px;
+        }
+
+        /* Form Controls */
+        .form-control {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 14px;
+            margin-bottom: 10px;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-control:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-control-sm {
+            padding: 6px 10px;
+            font-size: 13px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #4a5568;
+        }
+
+        /* Color Picker */
+        .color-picker {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .color-option {
+            width: 30px;
+            height: 30px;
+            border-radius: 6px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .color-option:hover {
+            transform: scale(1.1);
+        }
+
+        .color-option.active {
+            border-color: var(--dark);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .color-input-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .color-input {
+            flex: 1;
+            height: 36px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0 10px;
+        }
+
+        .color-preview {
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+        }
+
+        /* Range Slider */
+        .range-container {
+            margin: 15px 0;
+        }
+
+        .range-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 13px;
+            color: #4a5568;
+        }
+
+        .range-slider {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--border);
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .range-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+            border: 3px solid white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        /* Toggle Switch */
+        .toggle-switch {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+
+        .toggle-track {
+            width: 44px;
+            height: 24px;
+            background: #cbd5e0;
+            border-radius: 12px;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .toggle-track.active {
+            background: var(--primary);
+        }
+
+        .toggle-thumb {
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            transition: all 0.3s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+
+        .toggle-track.active .toggle-thumb {
+            left: 22px;
+        }
+
+        /* Symbol Picker */
+        .symbols-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .symbol-item {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            background: var(--light);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 1px solid var(--border);
+        }
+
+        .symbol-item:hover {
+            background: var(--primary-light);
+            transform: scale(1.1);
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 1000;
+        }
+
+        .action-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+
+        .btn-save {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-save:hover {
+            background: #38a169;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(72, 187, 120, 0.3);
+        }
+
+        .btn-export {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-export:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-clear {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-clear:hover {
+            background: #e53e3e;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(245, 101, 101, 0.3);
+        }
+
+        /* Element Specific Styles */
+        .text-heading {
+            font-size: 28px;
+            font-weight: bold;
+            margin: 0;
+            padding: 10px;
+        }
+
+        .text-paragraph {
+            font-size: 16px;
+            line-height: 1.6;
+            margin: 0;
+            padding: 10px;
+            color: #4a5568;
+        }
+
+        .form-field-container {
+            padding: 10px;
+        }
+
+        .form-field-container label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #2d3748;
+        }
+
+        .form-field-container input,
+        .form-field-container textarea,
+        .form-field-container select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .divider-element {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 2px;
+            background: #e2e8f0;
+        }
+
+        .divider-with-text {
+            border: none;
+            height: auto;
+        }
+
+        .divider-with-text::before {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #e2e8f0;
+            margin-right: 10px;
+        }
+
+        .divider-with-text::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #e2e8f0;
+            margin-left: 10px;
+        }
+
+        .divider-text {
+            padding: 0 15px;
+            color: #718096;
+            font-size: 14px;
+        }
+
+        .image-element {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .image-element img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .image-caption {
+            margin-top: 8px;
+            font-size: 14px;
+            color: #718096;
+            text-align: center;
+            font-style: italic;
+        }
+
+        /* Notification */
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--success);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 10000;
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .notification.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        .notification.error {
+            background: var(--danger);
+        }
+
+        .notification.warning {
+            background: var(--warning);
+        }
+
+        /* Responsive */
+        @media (max-width: 1400px) {
+            .app-container {
+                grid-template-columns: 70px 250px 1fr;
+            }
+            .properties-panel {
+                display: none;
+            }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Left Toolbar -->
+        <div class="toolbar">
+            <div class="toolbar-item active" data-section="elements">
+                <i class="fas fa-shapes"></i>
+                <span>Elements</span>
+            </div>
+            <div class="toolbar-item" data-section="templates">
+                <i class="fas fa-layer-group"></i>
+                <span>Templates</span>
+            </div>
+            <div class="toolbar-item" data-section="text">
+                <i class="fas fa-font"></i>
+                <span>Text</span>
+            </div>
+            <div class="toolbar-item" data-section="background">
+                <i class="fas fa-image"></i>
+                <span>Background</span>
+            </div>
+            <div class="toolbar-item" data-section="export">
+                <i class="fas fa-download"></i>
+                <span>Export</span>
+            </div>
+        </div>
+
+        <!-- Elements Panel -->
+        <div class="elements-panel" id="elementsPanel">
+            <!-- Text Elements -->
+            <div class="panel-title">Text Elements</div>
+            <div class="elements-grid">
+                <div class="element-card" data-type="heading">
+                    <i class="fas fa-heading"></i>
+                    <span>Heading</span>
+                </div>
+                <div class="element-card" data-type="subheading">
+                    <i class="fas fa-heading"></i>
+                    <span>Subheading</span>
+                </div>
+                <div class="element-card" data-type="paragraph">
+                    <i class="fas fa-paragraph"></i>
+                    <span>Paragraph</span>
+                </div>
+                <div class="element-card" data-type="label">
+                    <i class="fas fa-tag"></i>
+                    <span>Label</span>
+                </div>
+            </div>
+
+            <!-- Form Elements -->
+            <div class="panel-title" style="margin-top: 25px;">Form Elements</div>
+            <div class="elements-grid">
+                <div class="element-card" data-type="text">
+                    <i class="fas fa-font"></i>
+                    <span>Text Field</span>
+                </div>
+                <div class="element-card" data-type="email">
+                    <i class="fas fa-envelope"></i>
+                    <span>Email Field</span>
+                </div>
+                <div class="element-card" data-type="password">
+                    <i class="fas fa-lock"></i>
+                    <span>Password</span>
+                </div>
+                <div class="element-card" data-type="number">
+                    <i class="fas fa-hashtag"></i>
+                    <span>Number</span>
+                </div>
+                <div class="element-card" data-type="textarea">
+                    <i class="fas fa-align-left"></i>
+                    <span>Text Area</span>
+                </div>
+                <div class="element-card" data-type="select">
+                    <i class="fas fa-caret-down"></i>
+                    <span>Dropdown</span>
+                </div>
+                <div class="element-card" data-type="checkbox">
+                    <i class="fas fa-check-square"></i>
+                    <span>Checkbox</span>
+                </div>
+                <div class="element-card" data-type="radio">
+                    <i class="fas fa-dot-circle"></i>
+                    <span>Radio</span>
+                </div>
+                <div class="element-card" data-type="button">
+                    <i class="fas fa-hand-pointer"></i>
+                    <span>Button</span>
+                </div>
+            </div>
+
+            <!-- Media Elements -->
+            <div class="panel-title" style="margin-top: 25px;">Media Elements</div>
+            <div class="elements-grid">
+                <div class="element-card" data-type="image">
+                    <i class="fas fa-image"></i>
+                    <span>Image</span>
+                </div>
+                <div class="element-card" data-type="divider">
+                    <i class="fas fa-minus"></i>
+                    <span>Divider</span>
+                </div>
+                <div class="element-card" data-type="spacer">
+                    <i class="fas fa-arrows-alt-v"></i>
+                    <span>Spacer</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Canvas Area -->
+        <div class="canvas-container">
+            <div class="canvas" id="canvas">
+                <!-- Dynamic elements will be added here -->
+            </div>
+        </div>
+
+        <!-- Properties Panel -->
+        <div class="properties-panel">
+            <!-- Form Properties -->
+            <div class="property-group">
+                <div class="property-title">
+                    <i class="fas fa-sliders-h"></i>
+                    Form Properties
+                </div>
+                <input type="text" class="form-control" id="formTitle" placeholder="Form Title" value="Contact Form">
+                <input type="text" class="form-control" id="formName" placeholder="Form Name" value="My Form">
+                
+                <div class="range-container">
+                    <div class="range-label">
+                        <span>Width</span>
+                        <span id="widthValue">800px</span>
+                    </div>
+                    <input type="range" class="range-slider" id="formWidth" min="400" max="1200" value="800" step="10">
+                </div>
+                
+                <div class="range-container">
+                    <div class="range-label">
+                        <span>Border Radius</span>
+                        <span id="radiusValue">12px</span>
+                    </div>
+                    <input type="range" class="range-slider" id="borderRadius" min="0" max="30" value="12">
+                </div>
+            </div>
+
+            <!-- Element Properties (Dynamic) -->
+            <div id="elementProperties">
+                <!-- Content will be loaded based on selected element -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="action-buttons">
+        <button class="action-btn btn-clear" onclick="clearCanvas()">
+            <i class="fas fa-trash"></i> Clear
+        </button>
+        <button class="action-btn btn-export" onclick="exportForm()">
+            <i class="fas fa-download"></i> Export
+        </button>
+        <button class="action-btn btn-save" onclick="saveForm()">
+            <i class="fas fa-save"></i> Save
+        </button>
+    </div>
+
+    <!-- Notification -->
+    <div class="notification" id="notification">
+        <i class="fas fa-check-circle"></i>
+        <span id="notificationText">Success!</span>
+    </div>
+
+    <script>
+        // Global variables
+        let elements = [];
+        let selectedElement = null;
+        let isDragging = false;
+        let isResizing = false;
+        let dragElement = null;
+        let resizeDirection = null;
+        let offsetX = 0;
+        let offsetY = 0;
+        
+        // Form data
+        let formData = {
+            title: 'Contact Form',
+            name: 'My Form',
+            width: 800,
+            height: 600,
+            background: '#ffffff',
+            borderRadius: 12
+        };
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            setupEventListeners();
+            setupCanvas();
+            loadSampleElements();
+        });
+        
+        // Setup event listeners
+        function setupEventListeners() {
+            // Element cards - click to add
+            document.querySelectorAll('.element-card').forEach(card => {
+                card.addEventListener('click', function() {
+                    const type = this.dataset.type;
+                    addElement(type);
+                });
+                
+                // Make draggable
+                card.setAttribute('draggable', 'true');
+                card.addEventListener('dragstart', function(e) {
+                    e.dataTransfer.setData('type', this.dataset.type);
+                });
+            });
+            
+            // Canvas drop event
+            const canvas = document.getElementById('canvas');
+            canvas.addEventListener('dragover', function(e) {
+                e.preventDefault();
+            });
+            
+            canvas.addEventListener('drop', function(e) {
+                e.preventDefault();
+                const type = e.dataTransfer.getData('type');
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                addElement(type, x, y);
+            });
+            
+            // Toolbar clicks
+            document.querySelectorAll('.toolbar-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    document.querySelectorAll('.toolbar-item').forEach(i => i.classList.remove('active'));
+                    this.classList.add('active');
+                });
+            });
+            
+            // Form property changes
+            document.getElementById('formWidth').addEventListener('input', function() {
+                const width = this.value;
+                document.getElementById('widthValue').textContent = width + 'px';
+                formData.width = parseInt(width);
+                document.getElementById('canvas').style.width = width + 'px';
+            });
+            
+            document.getElementById('borderRadius').addEventListener('input', function() {
+                const radius = this.value;
+                document.getElementById('radiusValue').textContent = radius + 'px';
+                formData.borderRadius = parseInt(radius);
+                document.getElementById('canvas').style.borderRadius = radius + 'px';
+            });
+        }
+        
+        // Setup canvas
+        function setupCanvas() {
+            const canvas = document.getElementById('canvas');
+            
+            // Click to deselect
+            canvas.addEventListener('mousedown', function(e) {
+                if (!e.target.closest('.canvas-element')) {
+                    deselectElement();
+                }
+            });
+            
+            // Global mouse events for dragging/resizing
+            document.addEventListener('mousemove', function(e) {
+                if (isDragging && dragElement) {
+                    const canvas = document.getElementById('canvas');
+                    const rect = canvas.getBoundingClientRect();
+                    
+                    let x = e.clientX - rect.left - offsetX;
+                    let y = e.clientY - rect.top - offsetY;
+                    
+                    // Boundary checking
+                    x = Math.max(0, Math.min(x, canvas.offsetWidth - dragElement.offsetWidth));
+                    y = Math.max(0, Math.min(y, canvas.offsetHeight - dragElement.offsetHeight));
+                    
+                    dragElement.style.left = x + 'px';
+                    dragElement.style.top = y + 'px';
+                    
+                    // Update element data
+                    if (selectedElement) {
+                        selectedElement.x = x;
+                        selectedElement.y = y;
+                    }
+                } else if (isResizing && dragElement && resizeDirection) {
+                    const canvas = document.getElementById('canvas');
+                    const rect = canvas.getBoundingClientRect();
+                    
+                    let newWidth = dragElement.offsetWidth;
+                    let newHeight = dragElement.offsetHeight;
+                    let newX = dragElement.offsetLeft;
+                    let newY = dragElement.offsetTop;
+                    
+                    const mouseX = e.clientX - rect.left;
+                    const mouseY = e.clientY - rect.top;
+                    
+                    // Resize based on direction
+                    if (resizeDirection.includes('e')) {
+                        newWidth = mouseX - newX;
+                    }
+                    if (resizeDirection.includes('w')) {
+                        const deltaX = dragElement.offsetLeft - mouseX;
+                        newX = mouseX;
+                        newWidth += deltaX;
+                    }
+                    if (resizeDirection.includes('s')) {
+                        newHeight = mouseY - newY;
+                    }
+                    if (resizeDirection.includes('n')) {
+                        const deltaY = dragElement.offsetTop - mouseY;
+                        newY = mouseY;
+                        newHeight += deltaY;
+                    }
+                    
+                    // Minimum size
+                    newWidth = Math.max(50, newWidth);
+                    newHeight = Math.max(30, newHeight);
+                    
+                    // Boundary checking
+                    newX = Math.max(0, Math.min(newX, canvas.offsetWidth - 50));
+                    newY = Math.max(0, Math.min(newY, canvas.offsetHeight - 30));
+                    newWidth = Math.min(newWidth, canvas.offsetWidth - newX);
+                    newHeight = Math.min(newHeight, canvas.offsetHeight - newY);
+                    
+                    dragElement.style.left = newX + 'px';
+                    dragElement.style.top = newY + 'px';
+                    dragElement.style.width = newWidth + 'px';
+                    dragElement.style.height = newHeight + 'px';
+                    
+                    // Update element data
+                    if (selectedElement) {
+                        selectedElement.x = newX;
+                        selectedElement.y = newY;
+                        selectedElement.width = newWidth;
+                        selectedElement.height = newHeight;
+                    }
+                }
+            });
+            
+            document.addEventListener('mouseup', function() {
+                isDragging = false;
+                isResizing = false;
+                dragElement = null;
+                resizeDirection = null;
+            });
+        }
+        
+        // Add element to canvas
+        function addElement(type, x = 100, y = 100) {
+            const elementId = 'element_' + Date.now();
+            let elementData = {
+                id: elementId,
+                type: type,
+                x: x,
+                y: y,
+                width: 200,
+                height: 40
+            };
+            
+            let elementHtml = '';
+            let content = '';
+            
+            // Create element based on type
+            switch(type) {
+                case 'heading':
+                    content = 'Heading';
+                    elementData.width = 300;
+                    elementData.height = 50;
+                    elementHtml = `<div class="text-heading" contenteditable="true">${content}</div>`;
+                    break;
+                    
+                case 'subheading':
+                    content = 'Subheading';
+                    elementData.width = 250;
+                    elementData.height = 40;
+                    elementHtml = `<h3 class="text-heading" style="font-size: 20px;" contenteditable="true">${content}</h3>`;
+                    break;
+                    
+                case 'paragraph':
+                    content = 'This is a paragraph of text. You can edit this content.';
+                    elementData.width = 400;
+                    elementData.height = 80;
+                    elementHtml = `<div class="text-paragraph" contenteditable="true">${content}</div>`;
+                    break;
+                    
+                case 'label':
+                    content = 'Label';
+                    elementData.width = 150;
+                    elementData.height = 30;
+                    elementHtml = `<div style="font-weight: 500; color: #4a5568;" contenteditable="true">${content}</div>`;
+                    break;
+                    
+                case 'text':
+                    content = `
+                        <div class="form-field-container">
+                            <label contenteditable="true">Text Field</label>
+                            <input type="text" placeholder="Enter text">
+                        </div>
+                    `;
+                    elementData.width = 250;
+                    elementData.height = 70;
+                    elementHtml = content;
+                    break;
+                    
+                case 'email':
+                    content = `
+                        <div class="form-field-container">
+                            <label contenteditable="true">Email Address</label>
+                            <input type="email" placeholder="you@example.com">
+                            <div style="font-size: 12px; color: #718096; margin-top: 4px;">
+                                <i class="fas fa-info-circle"></i> Must contain @ symbol
+                            </div>
+                        </div>
+                    `;
+                    elementData.width = 250;
+                    elementData.height = 85;
+                    elementHtml = content;
+                    break;
+                    
+                case 'password':
+                    content = `
+                        <div class="form-field-container">
+                            <label contenteditable="true">Password</label>
+                            <input type="password" placeholder="Enter password">
+                            <div style="font-size: 12px; color: #718096; margin-top: 4px;">
+                                <i class="fas fa-shield-alt"></i> Minimum 6 characters
+                            </div>
+                        </div>
+                    `;
+                    elementData.width = 250;
+                    elementData.height = 85;
+                    elementHtml = content;
+                    break;
+                    
+                case 'textarea':
+                    content = `
+                        <div class="form-field-container">
+                            <label contenteditable="true">Message</label>
+                            <textarea placeholder="Enter your message..." rows="3"></textarea>
+                        </div>
+                    `;
+                    elementData.width = 300;
+                    elementData.height = 120;
+                    elementHtml = content;
+                    break;
+                    
+                case 'divider':
+                    content = `
+                        <div class="divider-element">
+                            <span class="divider-text" contenteditable="true">OR</span>
+                        </div>
+                    `;
+                    elementData.width = 300;
+                    elementData.height = 30;
+                    elementHtml = content;
+                    break;
+                    
+                case 'image':
+                    content = `
+                        <div class="image-element">
+                            <img src="https://via.placeholder.com/300x200" alt="Sample Image" style="width: 100%; height: 100%; object-fit: cover;">
+                            <div class="image-caption" contenteditable="true">Image Caption</div>
+                        </div>
+                    `;
+                    elementData.width = 300;
+                    elementData.height = 220;
+                    elementHtml = content;
+                    break;
+                    
+                case 'button':
+                    content = `
+                        <button style="
+                            width: 100%;
+                            height: 100%;
+                            background: #667eea;
+                            color: white;
+                            border: none;
+                            border-radius: 6px;
+                            font-size: 16px;
+                            font-weight: 500;
+                            cursor: pointer;
+                        " contenteditable="true">Button</button>
+                    `;
+                    elementData.width = 120;
+                    elementData.height = 40;
+                    elementHtml = content;
+                    break;
+                    
+                default:
+                    content = `<div style="padding: 10px;">${type}</div>`;
+                    elementHtml = content;
+                    break;
+            }
+            
+            // Create element container
+            const elementDiv = document.createElement('div');
+            elementDiv.className = 'canvas-element';
+            elementDiv.id = elementId;
+            elementDiv.style.left = x + 'px';
+            elementDiv.style.top = y + 'px';
+            elementDiv.style.width = elementData.width + 'px';
+            elementDiv.style.height = elementData.height + 'px';
+            
+            elementDiv.innerHTML = `
+                <div class="element-content">
+                    ${elementHtml}
+                </div>
+                <div class="element-controls">
+                    <button class="control-btn" onclick="duplicateElement('${elementId}')">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                    <button class="control-btn" onclick="deleteElement('${elementId}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    <button class="control-btn" onclick="bringToFront('${elementId}')">
+                        <i class="fas fa-layer-group"></i>
+                    </button>
+                </div>
+                <div class="resize-handle resize-nw"></div>
+                <div class="resize-handle resize-ne"></div>
+                <div class="resize-handle resize-sw"></div>
+                <div class="resize-handle resize-se"></div>
+                <div class="resize-handle resize-n"></div>
+                <div class="resize-handle resize-s"></div>
+                <div class="resize-handle resize-e"></div>
+                <div class="resize-handle resize-w"></div>
+            `;
+            
+            // Add event listeners for selection and dragging
+            elementDiv.addEventListener('mousedown', function(e) {
+                if (e.target.closest('.control-btn') || e.target.closest('.resize-handle')) {
+                    return;
+                }
+                
+                selectElement(elementId, elementData);
+                
+                if (!e.target.closest('input') && !e.target.closest('textarea') && !e.target.closest('button')) {
+                    startDrag(elementId, e);
+                }
+            });
+            
+            // Add resize handle events
+            elementDiv.querySelectorAll('.resize-handle').forEach(handle => {
+                handle.addEventListener('mousedown', function(e) {
+                    e.stopPropagation();
+                    startResize(elementId, this.className);
+                });
+            });
+            
+            // Add to canvas
+            document.getElementById('canvas').appendChild(elementDiv);
+            
+            // Add to array
+            elements.push(elementData);
+            
+            // Show notification
+            showNotification('Element added successfully!');
+            
+            // Select the new element
+            selectElement(elementId, elementData);
+        }
+        
+        // Start dragging
+        function startDrag(elementId, e) {
+            isDragging = true;
+            dragElement = document.getElementById(elementId);
+            
+            const rect = dragElement.getBoundingClientRect();
+            offsetX = e.clientX - rect.left;
+            offsetY = e.clientY - rect.top;
+        }
+        
+        // Start resizing
+        function startResize(elementId, className) {
+            isResizing = true;
+            dragElement = document.getElementById(elementId);
+            
+            // Extract direction from class name
+            if (className.includes('nw')) resizeDirection = 'nw';
+            else if (className.includes('ne')) resizeDirection = 'ne';
+            else if (className.includes('sw')) resizeDirection = 'sw';
+            else if (className.includes('se')) resizeDirection = 'se';
+            else if (className.includes('n')) resizeDirection = 'n';
+            else if (className.includes('s')) resizeDirection = 's';
+            else if (className.includes('e')) resizeDirection = 'e';
+            else if (className.includes('w')) resizeDirection = 'w';
+        }
+        
+        // Select element
+        function selectElement(elementId, elementData) {
+            // Deselect previous
+            deselectElement();
+            
+            // Select new element
+            const element = document.getElementById(elementId);
+            element.classList.add('selected');
+            selectedElement = elementData;
+            
+            // Show element properties
+            showElementProperties(elementData);
+            
+            // Bring to front
+            element.style.zIndex = 1000;
+        }
+        
+        // Deselect element
+        function deselectElement() {
+            document.querySelectorAll('.canvas-element.selected').forEach(el => {
+                el.classList.remove('selected');
+            });
+            selectedElement = null;
+            
+            // Clear properties panel
+            document.getElementById('elementProperties').innerHTML = '';
+        }
+        
+        // Show element properties
+        function showElementProperties(element) {
+            let propertiesHtml = '';
+            
+            // Common properties for all elements
+            propertiesHtml += `
+                <div class="property-group">
+                    <div class="property-title">
+                        <i class="fas fa-cube"></i>
+                        Element Properties
+                    </div>
+                    <div class="form-label">Element Type</div>
+                    <div style="padding: 8px 12px; background: #f7fafc; border-radius: 6px; margin-bottom: 15px; font-size: 14px;">
+                        ${element.type.charAt(0).toUpperCase() + element.type.slice(1)}
+                    </div>
+                    
+                    <div class="range-container">
+                        <div class="range-label">
+                            <span>Width</span>
+                            <span>${element.width}px</span>
+                        </div>
+                        <input type="range" class="range-slider" min="50" max="500" value="${element.width}" 
+                               oninput="updateElementProperty('width', this.value)">
+                    </div>
+                    
+                    <div class="range-container">
+                        <div class="range-label">
+                            <span>Height</span>
+                            <span>${element.height}px</span>
+                        </div>
+                        <input type="range" class="range-slider" min="30" max="300" value="${element.height}" 
+                               oninput="updateElementProperty('height', this.value)">
+                    </div>
+                </div>
+            `;
+            
+            // Type-specific properties
+            switch(element.type) {
+                case 'heading':
+                case 'subheading':
+                case 'paragraph':
+                case 'label':
+                    propertiesHtml += `
+                        <div class="property-group">
+                            <div class="property-title">
+                                <i class="fas fa-palette"></i>
+                                Text Styling
+                            </div>
+                            <div class="color-picker">
+                                <div class="color-option active" style="background: #000000;"></div>
+                                <div class="color-option" style="background: #4a5568;"></div>
+                                <div class="color-option" style="background: #718096;"></div>
+                                <div class="color-option" style="background: #667eea;"></div>
+                                <div class="color-option" style="background: #48bb78;"></div>
+                            </div>
+                            <input type="color" class="form-control" value="#000000" 
+                                   onchange="updateElementStyle('color', this.value)">
+                            
+                            <div class="range-container">
+                                <div class="range-label">
+                                    <span>Font Size</span>
+                                    <span>16px</span>
+                                </div>
+                                <input type="range" class="range-slider" min="8" max="72" value="16" 
+                                       oninput="updateElementStyle('fontSize', this.value + 'px')">
+                            </div>
+                        </div>
+                    `;
+                    break;
+                    
+                case 'email':
+                    propertiesHtml += `
+                        <div class="property-group">
+                            <div class="property-title">
+                                <i class="fas fa-envelope"></i>
+                                Email Settings
+                            </div>
+                            <div class="toggle-switch" onclick="toggleProperty('required')">
+                                <div class="toggle-track">
+                                    <div class="toggle-thumb"></div>
+                                </div>
+                                <span>Required Field</span>
+                            </div>
+                            
+                            <div class="form-label">Validation Message</div>
+                            <input type="text" class="form-control" value="Must contain @ symbol" 
+                                   onchange="updateElementProperty('validation', this.value)">
+                        </div>
+                    `;
+                    break;
+                    
+                case 'divider':
+                    propertiesHtml += `
+                        <div class="property-group">
+                            <div class="property-title">
+                                <i class="fas fa-minus"></i>
+                                Divider Style
+                            </div>
+                            <select class="form-control" onchange="updateElementStyle('borderStyle', this.value)">
+                                <option value="solid">Solid</option>
+                                <option value="dashed">Dashed</option>
+                                <option value="dotted">Dotted</option>
+                                <option value="double">Double</option>
+                            </select>
+                            
+                            <div class="range-container">
+                                <div class="range-label">
+                                    <span>Thickness</span>
+                                    <span>1px</span>
+                                </div>
+                                <input type="range" class="range-slider" min="1" max="10" value="1" 
+                                       oninput="updateElementStyle('borderWidth', this.value + 'px')">
+                            </div>
+                            
+                            <div class="color-picker">
+                                <div class="color-option active" style="background: #e2e8f0;"></div>
+                                <div class="color-option" style="background: #cbd5e0;"></div>
+                                <div class="color-option" style="background: #a0aec0;"></div>
+                                <div class="color-option" style="background: #667eea;"></div>
+                            </div>
+                        </div>
+                    `;
+                    break;
+            }
+            
+            document.getElementById('elementProperties').innerHTML = propertiesHtml;
+        }
+        
+        // Update element property
+        function updateElementProperty(property, value) {
+            if (!selectedElement) return;
+            
+            selectedElement[property] = value;
+            
+            const element = document.getElementById(selectedElement.id);
+            if (property === 'width') {
+                element.style.width = value + 'px';
+            } else if (property === 'height') {
+                element.style.height = value + 'px';
+            }
+        }
+        
+        // Update element style
+        function updateElementStyle(property, value) {
+            if (!selectedElement) return;
+            
+            const element = document.getElementById(selectedElement.id);
+            element.style[property] = value;
+        }
+        
+        // Toggle property
+        function toggleProperty(property) {
+            if (!selectedElement) return;
+            
+            const toggle = event.target.closest('.toggle-switch');
+            const track = toggle.querySelector('.toggle-track');
+            track.classList.toggle('active');
+            
+            selectedElement[property] = track.classList.contains('active');
+        }
+        
+        // Duplicate element
+        function duplicateElement(elementId) {
+            const element = elements.find(el => el.id === elementId);
+            if (element) {
+                const newElement = {...element};
+                newElement.id = 'element_' + Date.now();
+                newElement.x += 20;
+                newElement.y += 20;
+                
+                // Clone the DOM element
+                const originalElement = document.getElementById(elementId);
+                const clonedElement = originalElement.cloneNode(true);
+                clonedElement.id = newElement.id;
+                clonedElement.style.left = newElement.x + 'px';
+                clonedElement.style.top = newElement.y + 'px';
+                clonedElement.classList.remove('selected');
+                
+                // Update event listeners
+                clonedElement.addEventListener('mousedown', function(e) {
+                    if (e.target.closest('.control-btn') || e.target.closest('.resize-handle')) {
+                        return;
+                    }
+                    selectElement(newElement.id, newElement);
+                    
+                    if (!e.target.closest('input') && !e.target.closest('textarea') && !e.target.closest('button')) {
+                        startDrag(newElement.id, e);
+                    }
+                });
+                
+                // Update control buttons
+                clonedElement.querySelectorAll('.control-btn').forEach(btn => {
+                    if (btn.querySelector('.fa-copy')) {
+                        btn.onclick = () => duplicateElement(newElement.id);
+                    } else if (btn.querySelector('.fa-trash')) {
+                        btn.onclick = () => deleteElement(newElement.id);
+                    } else if (btn.querySelector('.fa-layer-group')) {
+                        btn.onclick = () => bringToFront(newElement.id);
+                    }
+                });
+                
+                // Update resize handles
+                clonedElement.querySelectorAll('.resize-handle').forEach(handle => {
+                    handle.addEventListener('mousedown', function(e) {
+                        e.stopPropagation();
+                        startResize(newElement.id, this.className);
+                    });
+                });
+                
+                document.getElementById('canvas').appendChild(clonedElement);
+                elements.push(newElement);
+                
+                showNotification('Element duplicated');
+            }
+        }
+        
+        // Delete element
+        function deleteElement(elementId) {
+            const element = document.getElementById(elementId);
+            if (element && confirm('Delete this element?')) {
+                element.remove();
+                elements = elements.filter(el => el.id !== elementId);
+                if (selectedElement && selectedElement.id === elementId) {
+                    deselectElement();
+                }
+                showNotification('Element deleted');
+            }
+        }
+        
+        // Bring element to front
+        function bringToFront(elementId) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                // Bring to front by increasing z-index
+                const allElements = document.querySelectorAll('.canvas-element');
+                let maxZIndex = 0;
+                allElements.forEach(el => {
+                    const zIndex = parseInt(el.style.zIndex) || 1;
+                    if (zIndex > maxZIndex) maxZIndex = zIndex;
+                });
+                element.style.zIndex = maxZIndex + 1;
+                
+                showNotification('Element brought to front');
+            }
+        }
+        
+        // Load sample elements
+        function loadSampleElements() {
+            // Add a sample heading
+            addElement('heading', 50, 50);
+            
+            // Add a sample email field
+            addElement('email', 50, 120);
+            
+            // Add a sample divider
+            addElement('divider', 50, 220);
+            
+            // Add a sample image
+            addElement('image', 50, 270);
+        }
+        
+        // Save form
+        function saveForm() {
+            const formTemplate = {
+                ...formData,
+                elements: elements
+            };
+            
+            fetch('/canva-form-builder/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formTemplate)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(data.message);
+                } else {
+                    showNotification('Error: ' + data.message, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('Failed to save form', 'error');
+            });
+        }
+        
+        // Export form
+        function exportForm() {
+            if (elements.length === 0) {
+                showNotification('No elements to export', 'warning');
+                return;
+            }
+            
+            // Generate HTML for export
+            let html = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>${formData.title}</title>
+                    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+                    <style>
+                        body {
+                            font-family: Arial, sans-serif;
+                            background: #f5f7fa;
+                            margin: 0;
+                            padding: 20px;
+                            display: flex;
+                            justify-content: center;
+                            align-items: center;
+                            min-height: 100vh;
+                        }
+                        .form-container {
+                            width: ${formData.width}px;
+                            min-height: ${formData.height}px;
+                            background: white;
+                            border-radius: ${formData.borderRadius}px;
+                            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+                            padding: 40px;
+                            position: relative;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="form-container">
+            `;
+            
+            // Add all elements
+            elements.forEach(element => {
+                const elementDiv = document.getElementById(element.id);
+                if (elementDiv) {
+                    const content = elementDiv.querySelector('.element-content').innerHTML;
+                    html += `<div style="position: absolute; left: ${element.x}px; top: ${element.y}px; width: ${element.width}px; height: ${element.height}px;">${content}</div>`;
+                }
+            });
+            
+            html += `
+                    </div>
+                </body>
+                </html>
+            `;
+            
+            // Download HTML file
+            const blob = new Blob([html], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${formData.name.replace(/\s+/g, '-')}.html`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showNotification('Form exported successfully!');
+        }
+        
+        // Clear canvas
+        function clearCanvas() {
+            if (elements.length === 0) {
+                showNotification('Canvas is already empty', 'warning');
+                return;
+            }
+            
+            if (confirm('Clear all elements?')) {
+                document.querySelectorAll('.canvas-element').forEach(el => el.remove());
+                elements = [];
+                deselectElement();
+                showNotification('Canvas cleared');
+            }
+        }
+        
+        // Show notification
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            const text = document.getElementById('notificationText');
+            
+            text.textContent = message;
+            
+            notification.className = 'notification';
+            notification.classList.add(type);
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

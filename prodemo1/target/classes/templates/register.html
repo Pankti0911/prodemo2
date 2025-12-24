@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Register</title>
+    <link rel="manifest" href="/manifest.json">
+   <script src="/js/main.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/service-worker.js')
+    .then(() => console.log('Service Worker registered'))
+    .catch(err => console.error('SW registration failed', err));
+}
+</script>
+</head>
+<script>
+let db;
+
+// IndexedDB setup
+const request = indexedDB.open("MyAppDB", 1);
+
+request.onupgradeneeded = function(event) {
+    db = event.target.result;
+    db.createObjectStore("registrations", { keyPath: "id", autoIncrement: true });
+};
+
+request.onsuccess = function(event) {
+    db = event.target.result;
+};
+
+request.onerror = function(event) {
+    console.error("IndexedDB error:", event.target.errorCode);
+};
+
+// Save offline
+function saveFormOffline(data) {
+    const tx = db.transaction("registrations", "readwrite");
+    const store = tx.objectStore("registrations");
+    store.add(data);
+    tx.oncomplete = () => console.log("Data saved offline:", data);
+}
+
+// Intercept form submit
+document.querySelector("form").addEventListener("submit", function(e) {
+    e.preventDefault();
+
+    const data = {
+        name: this.querySelector('input[name="name"]').value,
+        email: this.querySelector('input[name="email"]').value,
+        password: this.querySelector('input[name="password"]').value,
+        date: new Date()
+    };
+
+    if (navigator.onLine) {
+        fetch('/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(res => res.json())
+        .then(() => {
+            alert("Registered successfully!");
+            this.reset();
+        })
+        .catch(() => {
+            saveFormOffline(data);
+            alert("No internet. Data saved offline.");
+            this.reset();
+        });
+    } else {
+        saveFormOffline(data);
+        alert("No internet. Data saved offline.");
+        this.reset();
+    }
+});
+
+// Sync offline data when online
+window.addEventListener("online", () => {
+    const tx = db.transaction("registrations", "readonly");
+    const store = tx.objectStore("registrations");
+    const allData = store.getAll();
+
+    allData.onsuccess = function() {
+        allData.result.forEach(item => {
+            fetch('/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(item)
+            })
+            .then(() => {
+                const delTx = db.transaction("registrations", "readwrite");
+                delTx.objectStore("registrations").delete(item.id);
+                console.log("Offline data synced:", item);
+            })
+            .catch(err => console.error("Sync failed:", err));
+        });
+    };
+});
+</script>
+<body>
+    <h2>Register</h2>
+    <form th:action="@{/register}" th:object="${user}" method="post">
+        <label>Name:</label>
+        <input type="text" th:field="*{name}" required/><br/>
+        <label>Email:</label>
+        <input type="email" th:field="*{email}" required/><br/>
+        <label>Password:</label>
+        <input type="password" th:field="*{password}" required/><br/>
+        <button type="submit">Register</button>
+    </form>
+
+    <p th:text="${message}"></p>
+</body>
+</html>
